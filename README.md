@@ -138,7 +138,7 @@ weights = 'model_weights/road'
 c = 0
 history = 1
 
-fp = FrameProducer(model_fn, c, weights, history, df, 5, transitions=[t1], frames_to_produce=60, mode="RGB", vid_output_name='output_video')
+fp = FrameProducer(model_fn, c, weights, history, df, 5, transitions=[t1], frames_to_produce=60, mode="RGB", vid_output_name='output_video.avi')
 
 fp.go()
 
