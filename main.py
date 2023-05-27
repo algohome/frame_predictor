@@ -80,6 +80,6 @@ if __name__ == "__main__":
                     normalization_function = lambda x : np.array([p/255 for p in [r for r in x]]),
                     preprocess_function = None)
 
-    fp = FrameProducer(model_fn, args.c, weights, args.history, df, 5, transitions=[], frames_to_produce=args.frames, save_dir='outputs/frames', mode="RGB", output_fps = args.fps, vid_output_name=args.output_path)
+    fp = FrameProducer(model_fn, args.c, weights, args.history, df, 5, transitions=[], frames_to_produce=args.frames, save_dir=None, mode="RGB", output_fps = args.fps, vid_output_name=args.output_path)
 
     fp.go()
