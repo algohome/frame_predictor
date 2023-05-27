@@ -1,31 +1,26 @@
 # Imports
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image
 import glob
 import os
-import sys
-import pathlib
-import keras
-from tensorflow.keras.layers import BatchNormalization
-from models import *
 import cv2
 
-
+# Parent class for different types of input
+# Must be able to retrieve, prepare, and serve n-many images at a time
 class DataFeeder:
-    def __init__(
-        self,
-        directory,
+    def __init__(self,
+        input_path,
         img_dims,
         mode,
         n_frames,
         normalization_function=None,
         preprocess_function=None,
-    ):
+        ):
         assert mode in ["RGB", "YCbCr"]
         assert img_dims[-1] == 3
 
         self.start_frame = 0
-        self.directory = directory
+        self.input_path = input_path
         self.img_dims = img_dims
         self.mode = mode
         self.n_frames = n_frames
@@ -42,11 +37,33 @@ class DataFeeder:
         else:
             self.preprocess_function = lambda x: x
 
+    def get_n_frames(self, **kwargs):
+        raise NotImplementedError
+    
+    def normalize(self, frame):
+        return self.normalization_function(frame)
+
+    def preprocess(self, frame):
+        return self.preprocess_function(frame)
+
+
+class JPGFeeder(DataFeeder):
+    def __init__(
+        self,
+        directory,
+        img_dims,
+        mode,
+        n_frames,
+        normalization_function=None,
+        preprocess_function=None,
+    ):
+        super().__init__(directory, img_dims, mode, n_frames, normalization_function, preprocess_function)
+
+        # Prepare JPG-specific data
         self.files = glob.glob(os.path.join(directory, "*"))
         self.files.sort()
-        print("Input frames:", len(self.files))
 
-    # Do I want this function to return n images or an array?
+
     def get_n_frames(self, start_frame):
         output_array = np.zeros(
             [self.img_dims[0], self.img_dims[1], self.img_dims[2] * self.n_frames]
@@ -64,14 +81,8 @@ class DataFeeder:
 
         return np.expand_dims(output_array, 0)
 
-    def normalize(self, frame):
-        return self.normalization_function(frame)
 
-    def preprocess(self, frame):
-        return self.preprocess_function(frame)
-
-
-class MP4Feeder:
+class MP4Feeder(DataFeeder):
     def __init__(
         self,
         input_video,
@@ -81,27 +92,9 @@ class MP4Feeder:
         normalization_function=None,
         preprocess_function=None,
     ):
-        assert mode in ["RGB", "YCbCr"]
-        assert img_dims[-1] == 3
+        super().__init__(input_video, img_dims, mode, n_frames, normalization_function, preprocess_function)
 
-        self.start_frame = 0
-        self.input_video = input_video
-        self.img_dims = img_dims
-        self.mode = mode
-        self.n_frames = n_frames
-
-        if normalization_function is not None:
-            self.normalization_function = normalization_function
-        else:
-            self.normalization_function = lambda x: np.array(
-                [p / 255 for p in [r for r in x]]
-            )  # Works for arrays lol
-
-        if preprocess_function is not None:
-            self.preprocess_function = preprocess_function
-        else:
-            self.preprocess_function = lambda x: x
-
+        # Prepare MP4-specific data
         self.buffer = np.ones(
             (img_dims[1], img_dims[0], self.img_dims[2] * self.n_frames)
         )
@@ -112,7 +105,7 @@ class MP4Feeder:
 
         for i in range(5):
             ret, frame = self.cap.read()
-            if not ret:
+            if isinstance(ret, type(None)):
                 print("Something went wrong reading the video :(")
             else:
                 frame = Image.fromarray(frame.astype("uint8")).resize(
@@ -123,7 +116,6 @@ class MP4Feeder:
                 frame = self.normalize(frame)
                 self.buffer[:, :, i * 3 : (i + 1) * (3)] = frame
 
-    # Do I want this function to return n images or an array?
     def get_n_frames(self, start_frame):
         output_array = np.zeros(
             [self.img_dims[1], self.img_dims[0], self.img_dims[2] * self.n_frames]
@@ -145,8 +137,3 @@ class MP4Feeder:
 
         return np.expand_dims(output_array, 0)
 
-    def normalize(self, frame):
-        return self.normalization_function(frame)
-
-    def preprocess(self, frame):
-        return self.preprocess_function(frame)
